@@ -1,0 +1,7 @@
+* text=auto
+
+*.jpg binary
+*.png binary
+*.gif binary
+
+*.kt text=auto diff=kotlin

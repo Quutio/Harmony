@@ -1,0 +1,59 @@
+# Gradle
+.gradle
+**/build/
+!src/**/build/
+
+# Ignore Gradle GUI config
+gradle-app.setting
+
+# Cache of project
+.gradletasknamecache
+
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Project
+.classpath
+.externalToolBuilders
+/.gradle
+.idea
+.project
+.settings
+.factorypath
+/eclipse
+nbproject
+atlassian-ide-plugin.xml
+build.xml
+nb-configuration.xml
+*.iml
+*.ipr
+*.iws
+/.apt_generated/
+*.launch
+/.nb-gradle/
+
+# Avoid ignoring Gradle wrapper
+!gradle-wrapper.jar
+!gradle-wrapper.properties

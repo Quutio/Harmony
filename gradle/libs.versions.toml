@@ -1,0 +1,9 @@
+[versions]
+kotlin = "2.0.0"
+shadow = "8.1.7"
+spotless = "6.25.0"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+shadow = { id = "io.github.goooler.shadow", version.ref = "shadow" }
