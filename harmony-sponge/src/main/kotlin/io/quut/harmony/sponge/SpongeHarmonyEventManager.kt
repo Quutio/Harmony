@@ -14,17 +14,39 @@ import org.spongepowered.plugin.PluginContainer
 import java.lang.invoke.MethodHandles
 import java.util.PriorityQueue
 
-internal class SpongeHarmonyEventManager<T>(
+internal class SpongeHarmonyEventManager<T : Any>(
 	private val scopeClass: Class<T>,
 	private val plugin: PluginContainer,
 	private val mappings: MutableMap<Class<*>, (Any) -> T?>,
-	private val listeners: MutableMap<Class<*>, MutableSet<IHarmonyEventListener<T>>>) : IHarmonyEventManager<T>
+	private val parentMappings: MutableMap<Class<*>, MutableMap<Class<*>, (Any, Any) -> T?>>,
+	private val listeners: MutableMap<Class<in T>, MutableSet<IHarmonyEventListener<T>>>) : IHarmonyEventManager<T>
 {
 	private val listenerRegistrations: MutableMap<Triple<EventType<*>, Order, Boolean>, ListenerRegistration> = hashMapOf()
-	private val scopes: MutableMap<T, ScopedEventManager> = hashMapOf()
+	private val unmappedRegisteredListener: MutableSet<RegisteredListener<*>> = mutableSetOf()
+
+	private val scopes: MutableMap<T, ScopeData> = hashMapOf()
 
 	override fun <TScope : T> registerScope(scope: TScope, options: IHarmonyScopeOptions<TScope>)
 	{
+		val childParentMapping: MutableMap<Class<*>, (Any, Any) -> Any?>?
+		if (options.child != null)
+		{
+			childParentMapping = this.computeParentMappings(scope.javaClass, options.child as SpongeHarmonyEventManager<*>)
+
+			// Validate first before modifying global state
+			if (options.validate)
+			{
+				childParentMapping.forEach()
+				{ (eventType) ->
+					this.findMapping(eventType) ?: throw UnsupportedOperationException("Unmapped event $eventType")
+				}
+			}
+		}
+		else
+		{
+			childParentMapping = null
+		}
+
 		val scopeEventManager = ScopedEventManager()
 		scopeEventManager.registerAll(scope, options.listeners)
 
@@ -40,32 +62,57 @@ internal class SpongeHarmonyEventManager<T>(
 			{
 				scopeEventManager.listeners.forEach()
 				{ listener ->
-					this.findMapping(listener.eventType.type) ?: throw UnsupportedOperationException("Unmapped event ${listener.eventType.type}")
+					this.findMapping(listener.eventType.type) ?: run()
+					{
+						SpongeHarmonyEventManager.walkHierarchy(listener.eventType.type)
+						{ child ->
+							this.parentMappings.values.forEach { map -> map[child]?.let { return@run } }
+						}
+
+						throw UnsupportedOperationException("Unmapped event ${listener.eventType.type}")
+					}
 				}
 			}
 		}
 
 		synchronized(scopeEventManager.lock)
 		{
-			scopeEventManager.listeners.forEach { listener -> this.register(listener) }
+			scopeEventManager.listeners.forEach(this::register)
+
+			if (options.child != null)
+			{
+				val child = options.child as SpongeHarmonyEventManager<*>
+
+				child.unmappedRegisteredListener.forEach(this::register)
+			}
 		}
 
-		this.scopes[scope] = scopeEventManager
+		this.scopes[scope] = ScopeData(scopeEventManager, options.child as? SpongeHarmonyEventManager<*>, childParentMapping)
 	}
 
 	override fun unregisterScope(scope: T)
 	{
-		val scopeEventManager: ScopedEventManager = this.scopes.remove(scope) ?: return
+		val scopeData: ScopeData = this.scopes.remove(scope) ?: return
+		val scopeEventManager: ScopedEventManager = scopeData.eventManager
 
 		synchronized(scopeEventManager.lock)
 		{
-			scopeEventManager.listeners.forEach { listener -> this.unregister(listener) }
+			scopeEventManager.listeners.forEach(this::unregister)
+
+			if (scopeData.child != null)
+			{
+				scopeData.child.unmappedRegisteredListener.forEach(this::unregister)
+			}
 		}
 	}
 
 	private fun register(listener: RegisteredListener<*>)
 	{
-		val mapping: (Event) -> T? = this.findMapping(listener.eventType.type) ?: return
+		val mapping: (Event) -> T? = this.findMapping(listener.eventType.type) ?: run()
+		{
+			this.unmappedRegisteredListener.add(listener)
+			return
+		}
 
 		val listenerRegistration: ListenerRegistration = this.listenerRegistrations.computeIfAbsent(
 			Triple(listener.eventType, listener.order, listener.isBeforeModifications))
@@ -73,8 +120,9 @@ internal class SpongeHarmonyEventManager<T>(
 			val listener = EventListener()
 			{ e: Event ->
 				val scope: T = mapping.invoke(e) ?: return@EventListener
+				val scopeData: ScopeData = this.scopes[scope] ?: return@EventListener
 
-				this.scopes[scope]?.post(e)
+				scopeData.handleEvent(scope, e)
 			}
 
 			Sponge.game().eventManager().registerListener(
@@ -95,19 +143,18 @@ internal class SpongeHarmonyEventManager<T>(
 	{
 		this.mappings[eventType]?.let { mapping -> return mapping }
 
-		val hierarchy: PriorityQueue<Pair<Class<*>, Int>> = PriorityQueue(Comparator.comparingInt { (_, priority) -> priority })
-		hierarchy.add(Pair(eventType, 0))
-
-		while (hierarchy.isNotEmpty())
-		{
-			val (child: Class<*>, priority: Int) = hierarchy.poll()
-
-			this.mappings[child]?.let { mapping -> return mapping }
-
-			child.interfaces.forEach { i -> hierarchy.add(Pair(i, priority + 1)) }
-		}
+		SpongeHarmonyEventManager.walkHierarchy(eventType) { child -> this.mappings[child]?.let { mapping -> return mapping } }
 
 		return null
+	}
+
+	private fun computeParentMappings(scopeType: Class<*>, manager: SpongeHarmonyEventManager<*>): MutableMap<Class<*>, (Any, Any) -> Any?>
+	{
+		val mappings: MutableMap<Class<*>, (Any, Any) -> Any?> = hashMapOf()
+
+		SpongeHarmonyEventManager.walkHierarchy(scopeType) { child -> manager.parentMappings[child]?.forEach(mappings::putIfAbsent) }
+
+		return mappings
 	}
 
 	private fun unregister(listener: RegisteredListener<*>)
@@ -140,15 +187,58 @@ internal class SpongeHarmonyEventManager<T>(
 		fun isEmpty(): Boolean = this.listeners.isEmpty()
 	}
 
-	internal class Builder<T>(private val scopeClass: Class<T>, private val plugin: PluginContainer) : IHarmonyEventManager.IBuilder<T>
+	private class ScopeData(
+		val eventManager: ScopedEventManager,
+		val child: SpongeHarmonyEventManager<*>?,
+		private val parentMappings: MutableMap<Class<*>, (Any, Any) -> Any?>?)
+	{
+		private val cachedMapping: MutableMap<Class<*>, ((Any, Any) -> Any?)?>? = if (this.parentMappings != null) hashMapOf() else null
+
+		fun handleEvent(scope: Any, event: Event)
+		{
+			this.eventManager.post(event)
+
+			if (this.cachedMapping == null)
+			{
+				return
+			}
+
+			val mapping: (Any, Any) -> Any? = this.cachedMapping.computeIfAbsent(event.javaClass)
+			{ key ->
+				this.parentMappings!![key]?.let { return@computeIfAbsent it }
+
+				SpongeHarmonyEventManager.walkHierarchy(key) { child -> this.parentMappings[child]?.let { return@computeIfAbsent it } }
+
+				return@computeIfAbsent null
+			} ?: return
+
+			val childScope: Any = mapping(scope, event) ?: return
+			val scopeData: ScopeData = this.child!!.scopes[childScope] ?: return
+
+			scopeData.eventManager.post(event)
+		}
+	}
+
+	internal class Builder<T : Any>(private val scopeClass: Class<T>, private val plugin: PluginContainer) : IHarmonyEventManager.IBuilder<T>
 	{
 		private val mappings: MutableMap<Class<*>, (Any) -> T?> = hashMapOf()
-		private val listeners: MutableMap<Class<*>, MutableSet<IHarmonyEventListener<T>>> = hashMapOf()
+		private val parentMappings: MutableMap<Class<*>, MutableMap<Class<*>, (Any, Any) -> T?>> = hashMapOf()
+		private val listeners: MutableMap<Class<in T>, MutableSet<IHarmonyEventListener<T>>> = hashMapOf()
 
 		@Suppress("UNCHECKED_CAST")
 		override fun <TEvent> mapping(eventClass: Class<in TEvent>, mapper: (TEvent) -> T?): Builder<T>
 		{
 			this.mappings.putIfAbsent(eventClass, mapper as (Any) -> T?)
+			return this
+		}
+
+		@Suppress("UNCHECKED_CAST")
+		override fun <TParentScope, TEvent> parentMapping(
+			parentScopeClass: Class<in TParentScope>,
+			eventClass: Class<in TEvent>,
+			mapper: (TParentScope, TEvent) -> T?): IHarmonyEventManager.IBuilder<T>
+		{
+			this.parentMappings.computeIfAbsent(parentScopeClass) { hashMapOf() }.putIfAbsent(eventClass, mapper as (Any, Any) -> T?)
 			return this
 		}
 
@@ -171,7 +261,26 @@ internal class SpongeHarmonyEventManager<T>(
 
 		override fun build(): IHarmonyEventManager<T>
 		{
-			return SpongeHarmonyEventManager(this.scopeClass, this.plugin, this.mappings, this.listeners)
+			return SpongeHarmonyEventManager(this.scopeClass, this.plugin, this.mappings, this.parentMappings, this.listeners)
+		}
+	}
+
+	companion object
+	{
+		internal inline fun walkHierarchy(clazz: Class<*>, consumer: (Class<*>) -> Unit)
+		{
+			val hierarchy: PriorityQueue<Pair<Class<*>, Int>> = PriorityQueue(Comparator.comparingInt { (_, priority) -> priority })
+			hierarchy.add(Pair(clazz, 0))
+
+			while (hierarchy.isNotEmpty())
+			{
+				val (child: Class<*>, priority: Int) = hierarchy.poll()
+
+				consumer(child)
+
+				child.superclass?.let { i -> hierarchy.add(Pair(i, priority + 1)) }
+				child.interfaces.forEach { i -> hierarchy.add(Pair(i, priority + 2)) }
+			}
 		}
 	}
 }

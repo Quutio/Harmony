@@ -9,7 +9,7 @@ import java.lang.invoke.MethodHandles
  *
  * @param T The scope type.
  */
-interface IHarmonyEventListener<in T>
+interface IHarmonyEventListener<in T : Any>
 {
 	/**
 	 * The scope type this listener can handle.
@@ -46,7 +46,7 @@ interface IHarmonyEventListener<in T>
 		 */
 		@JvmStatic
 		@JvmOverloads
-		fun <T> of(scopeClass: Class<in T>, plugin: Any, listener: (T) -> Any, lookup: MethodHandles.Lookup? = null): IHarmonyEventListener<T> =
+		fun <T : Any> of(scopeClass: Class<in T>, plugin: Any, listener: (T) -> Any, lookup: MethodHandles.Lookup? = null): IHarmonyEventListener<T> =
 			Impl(scopeClass, plugin, listener, lookup)
 
 		/**
@@ -58,11 +58,11 @@ interface IHarmonyEventListener<in T>
 		 * @param lookup The lookup with which to access the listener object.
 		 * @return A new [IHarmonyEventListener].
 		 */
-		inline fun <reified T> of(plugin: Any, noinline listener: (T) -> Any, lookup: MethodHandles.Lookup? = null): IHarmonyEventListener<T> =
+		inline fun <reified T : Any> of(plugin: Any, noinline listener: (T) -> Any, lookup: MethodHandles.Lookup? = null): IHarmonyEventListener<T> =
 			this.of(T::class.java, plugin, listener, lookup)
 	}
 
-	private class Impl<in T>(
+	private class Impl<in T : Any>(
 		override val scopeClass: Class<in T>,
 		override val plugin: Any,
 		override val listener: (T) -> Any,

@@ -5,8 +5,17 @@ package io.quut.harmony.api
  *
  * @param T The scope type.
  */
-interface IHarmonyScopeOptions<in T>
+interface IHarmonyScopeOptions<in T : Any>
 {
+	/**
+	 * The child [event manager][IHarmonyEventManager] which
+	 * is processed after the parent has called its own listeners.
+	 *
+	 * The child is able to do further processing based on the
+	 * context the parent chose using the [IHarmonyEventManager.IBuilder.parentMapping].
+	 */
+	val child: IHarmonyEventManager<*>?
+
 	/**
 	 * **Additional** listeners to register for this scope.
 	 */
@@ -31,7 +40,7 @@ interface IHarmonyScopeOptions<in T>
 		 */
 		@Suppress("UNCHECKED_CAST")
 		@JvmStatic
-		fun <T> validate(): IHarmonyScopeOptions<T> = this.validate as IHarmonyScopeOptions<T>
+		fun <T : Any> validate(): IHarmonyScopeOptions<T> = this.validate as IHarmonyScopeOptions<T>
 
 		/**
 		 * Gets a [IHarmonyScopeOptions] which has its [IHarmonyScopeOptions.validate]
@@ -41,22 +50,24 @@ interface IHarmonyScopeOptions<in T>
 		 */
 		@Suppress("UNCHECKED_CAST")
 		@JvmStatic
-		fun <T> skipValidation(): IHarmonyScopeOptions<T> = this.skipValidation as IHarmonyScopeOptions<T>
+		fun <T : Any> skipValidation(): IHarmonyScopeOptions<T> = this.skipValidation as IHarmonyScopeOptions<T>
 
 		/**
 		 * Creates a [IHarmonyScopeOptions].
 		 *
 		 * @param T The scope type.
 		 * @param listeners The additional listeners to register as part of the scope registration.
+		 * @param child The child event manager.
 		 * @param validate If `true` runs validation as part of the scope registration.
 		 */
 		@JvmStatic
 		@JvmOverloads
-		fun <T> of(vararg listeners: IHarmonyEventListener<T>, validate: Boolean = true): IHarmonyScopeOptions<T> =
-			Impl(listeners.toList(), validate)
+		fun <T : Any> of(vararg listeners: IHarmonyEventListener<T>, child: IHarmonyEventManager<*>? = null, validate: Boolean = true): IHarmonyScopeOptions<T> =
+			Impl(child, listeners.toList(), validate)
 	}
 
-	private class Impl<in T>(
+	private class Impl<in T : Any>(
+		override val child: IHarmonyEventManager<*>?,
 		override val listeners: Collection<IHarmonyEventListener<T>>,
 		override val validate: Boolean
 	) : IHarmonyScopeOptions<T>

@@ -31,12 +31,12 @@ internal class ScopedEventManager
 		this.listeners = multiMap.javaClass.getDeclaredMethod("values").invoke(multiMap) as Collection<RegisteredListener<*>>
 	}
 
-	internal fun <T> registerAll(scope: T, listeners: Collection<IHarmonyEventListener<T>>)
+	internal fun <T : Any> registerAll(scope: T, listeners: Collection<IHarmonyEventListener<T>>)
 	{
 		listeners.forEach { listener -> this.register(scope, listener) }
 	}
 
-	private fun <T> register(scope: T, listener: IHarmonyEventListener<T>)
+	private fun <T : Any> register(scope: T, listener: IHarmonyEventListener<T>)
 	{
 		if (listener.lookup != null)
 		{

@@ -9,7 +9,7 @@ import java.util.ServiceLoader
  *
  * @param T The scope type.
  */
-interface IHarmonyEventManager<T>
+interface IHarmonyEventManager<T : Any>
 {
 	/**
 	 * Registers a new scope and creates the associated
@@ -52,7 +52,7 @@ interface IHarmonyEventManager<T>
 	 *
 	 * @param T The scope type.
 	 */
-	interface IBuilder<T>
+	interface IBuilder<T : Any>
 	{
 		/**
 		 * Adds an event mapper that finds the associated
@@ -64,6 +64,21 @@ interface IHarmonyEventManager<T>
 		 * @return This builder, for chaining.
 		 */
 		fun <TEvent> mapping(eventClass: Class<in TEvent>, mapper: (TEvent) -> T?): IBuilder<T>
+
+		/**
+		 * Adds an event mapper that finds the associated
+		 * scope to redirect this event to.
+		 *
+		 * The chosen scope of the parent [event manager][IHarmonyEventManager]
+		 * is available here to aid the redirection.
+		 *
+		 * @param TParentScope The parent scope type.
+		 * @param TEvent The event type to map.
+		 * @param eventClass The event class to map.
+		 * @param mapper The event mapper.
+		 * @return This builder, for chaining.
+		 */
+		fun <TParentScope, TEvent> parentMapping(parentScopeClass: Class<in TParentScope>, eventClass: Class<in TEvent>, mapper: (TParentScope, TEvent) -> T?): IBuilder<T>
 
 		/**
 		 * Adds a default listener for the associated scope
@@ -145,8 +160,11 @@ interface IHarmonyEventManager<T>
 			 * @param mapper The event mapper.
 			 * @return This builder, for chaining.
 			 */
-			inline fun <TScope, reified TEvent> IBuilder<TScope>.mapping(noinline mapper: (TEvent) -> TScope?): IBuilder<TScope> =
+			inline fun <TScope : Any, reified TEvent> IBuilder<TScope>.mapping(noinline mapper: (TEvent) -> TScope?): IBuilder<TScope> =
 				this.mapping(TEvent::class.java, mapper)
+
+			inline fun <TScope : Any, reified TParentScope, reified TEvent> IBuilder<TScope>.parentMapping(noinline mapper: (TParentScope, TEvent) -> TScope?): IBuilder<TScope> =
+				this.parentMapping(TParentScope::class.java, TEvent::class.java, mapper)
 		}
 	}
 
@@ -155,7 +173,7 @@ interface IHarmonyEventManager<T>
 	 *
 	 * @param T The scope type.
 	 */
-	interface IFactory<T>
+	interface IFactory<T : Any>
 	{
 		fun builder(scopeClass: Class<T>, plugin: Any): IBuilder<T>
 	}
@@ -169,7 +187,7 @@ interface IHarmonyEventManager<T>
 		 * @param plugin The underlying platform plugin which is associated to the event manager.
 		 * @return A new [IBuilder].
 		 */
-		inline fun <reified T> builder(plugin: Any) = this.builder(T::class.java, plugin)
+		inline fun <reified T : Any> builder(plugin: Any) = this.builder(T::class.java, plugin)
 
 		/**
 		 * Creates a [IBuilder] to get [IHarmonyEventManager]'s.
@@ -181,7 +199,7 @@ interface IHarmonyEventManager<T>
 		 */
 		@Suppress("UNCHECKED_CAST")
 		@JvmStatic
-		fun <T> builder(scopeClass: Class<T>, plugin: Any): IBuilder<T>
+		fun <T : Any> builder(scopeClass: Class<T>, plugin: Any): IBuilder<T>
 		{
 			val factory: IFactory<T> = ServiceLoader.load(IFactory::class.java).findFirst().orElseThrow() as IFactory<T>
 			return factory.builder(scopeClass, plugin)
