@@ -66,6 +66,19 @@ interface IHarmonyEventManager<T : Any>
 		fun <TEvent> mapping(eventClass: Class<in TEvent>, mapper: (TEvent) -> T?): IBuilder<T>
 
 		/**
+		 * Adds a scope mapper that finds the associated
+		 * scope to redirect the events to.
+		 *
+		 * The chosen scope of the parent [event manager][IHarmonyEventManager]
+		 * is available here to aid the redirection.
+		 *
+		 * @param TParentScope The parent scope type.
+		 * @param mapper The scope mapper.
+		 * @return This builder, for chaining.
+		 */
+		fun <TParentScope> parentMapping(parentScopeClass: Class<in TParentScope>, mapper: (TParentScope) -> T?): IBuilder<T>
+
+		/**
 		 * Adds an event mapper that finds the associated
 		 * scope to redirect this event to.
 		 *
@@ -163,6 +176,34 @@ interface IHarmonyEventManager<T : Any>
 			inline fun <TScope : Any, reified TEvent> IBuilder<TScope>.mapping(noinline mapper: (TEvent) -> TScope?): IBuilder<TScope> =
 				this.mapping(TEvent::class.java, mapper)
 
+			/**
+			 * Adds a scope mapper that finds the associated
+			 * scope to redirect the events to.
+			 *
+			 * The chosen scope of the parent [event manager][IHarmonyEventManager]
+			 * is available here to aid the redirection.
+			 *
+			 * @param TScope The scope type.
+			 * @param TParentScope The parent scope type.
+			 * @param mapper The scope mapper.
+			 * @return This builder, for chaining.
+			 */
+			inline fun <TScope : Any, reified TParentScope> IBuilder<TScope>.parentMapping(noinline mapper: (TParentScope) -> TScope?): IBuilder<TScope> =
+				this.parentMapping(TParentScope::class.java, mapper)
+
+			/**
+			 * Adds an event mapper that finds the associated
+			 * scope to redirect this event to.
+			 *
+			 * The chosen scope of the parent [event manager][IHarmonyEventManager]
+			 * is available here to aid the redirection.
+			 *
+			 * @param TScope The scope type.
+			 * @param TParentScope The parent scope type.
+			 * @param TEvent The event type to map.
+			 * @param mapper The event mapper.
+			 * @return This builder, for chaining.
+			 */
 			inline fun <TScope : Any, reified TParentScope, reified TEvent> IBuilder<TScope>.parentMapping(noinline mapper: (TParentScope, TEvent) -> TScope?): IBuilder<TScope> =
 				this.parentMapping(TParentScope::class.java, TEvent::class.java, mapper)
 		}

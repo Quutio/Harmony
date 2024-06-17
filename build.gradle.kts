@@ -6,7 +6,7 @@ plugins {
 
 allprojects {
 	group = "io.quut"
-	version = "1.1"
+	version = "1.2"
 
 	apply(plugin = "com.diffplug.spotless")
 
