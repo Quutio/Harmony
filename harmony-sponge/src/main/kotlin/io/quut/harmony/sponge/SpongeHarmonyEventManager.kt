@@ -121,7 +121,7 @@ internal class SpongeHarmonyEventManager<T : Any>(
 				val scope: T = mapping(e) ?: return@EventListener
 				val scopeData: ScopeData = this.scopes[scope] ?: return@EventListener
 
-				scopeData.handleEvent(scope, e, listener.eventType.type)
+				scopeData.handleEvent(scope, e)
 			}
 
 			Sponge.game().eventManager().registerListener(
@@ -210,11 +210,23 @@ internal class SpongeHarmonyEventManager<T : Any>(
 		private val child: SpongeHarmonyEventManager<*>?,
 		private val childMappings: Map<Class<*>, (Any, Any) -> Any?>)
 	{
-		fun handleEvent(scope: Any, event: Event, eventClass: Class<*>)
+		private val mappingCache: MutableMap<Class<*>, ((Any, Any) -> Any?)?> = hashMapOf()
+
+		fun handleEvent(scope: Any, event: Event)
 		{
 			this.eventManager.post(event)
 
-			val childScope: Any = this.childMappings[eventClass]?.invoke(scope, event) ?: return
+			val mapping: (Any, Any) -> Any? = synchronized(this.mappingCache)
+			{
+				this.mappingCache.computeIfAbsent(event.javaClass)
+				{ key ->
+					SpongeHarmonyEventManager.walkHierarchy(key) { child -> this.childMappings[child]?.let { return@computeIfAbsent it } }
+
+					return@computeIfAbsent null
+				}
+			} ?: return
+
+			val childScope: Any = mapping(scope, event) ?: return
 			val scopeData: ScopeData = this.child!!.scopes[childScope] ?: return
 
 			scopeData.eventManager.post(event)

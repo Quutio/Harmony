@@ -49,6 +49,7 @@ public final class HarmonyPlugin
 			classPool.get("org.spongepowered.plugin.PluginContainer"),
 			classPool.get("java.util.Map"),
 			classPool.get("java.util.Map"),
+			classPool.get("java.util.Map")
 		}).insertAfter(initialization.toString());
 	}
 
