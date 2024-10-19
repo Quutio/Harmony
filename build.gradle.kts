@@ -6,7 +6,7 @@ plugins {
 
 allprojects {
 	group = "io.quut"
-	version = "1.2.1"
+	version = "1.2.2"
 
 	apply(plugin = "com.diffplug.spotless")
 
@@ -41,6 +41,10 @@ allprojects {
 subprojects {
 	apply(plugin = "java-library")
 	apply(plugin = "maven-publish")
+
+	java {
+		withSourcesJar()
+	}
 
 	publishing {
 		publications {
