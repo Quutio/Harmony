@@ -2,12 +2,11 @@ package io.quut.harmony.sponge
 
 import io.quut.harmony.api.IHarmonyEventListener
 import org.spongepowered.api.event.Event
-import org.spongepowered.api.event.EventListener
-import org.spongepowered.api.event.EventListenerRegistration
 import org.spongepowered.common.event.manager.RegisteredListener
 import org.spongepowered.common.event.manager.SpongeEventManager
 import org.spongepowered.plugin.PluginContainer
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 
 internal class ScopedEventManager
 {
@@ -53,13 +52,7 @@ internal class ScopedEventManager
 	@Suppress("UNCHECKED_CAST")
 	internal fun register(listener: RegisteredListener<*>)
 	{
-		this.eventManager.registerListener(
-			EventListenerRegistration.builder(listener.eventType.type)
-				.plugin(listener.plugin)
-				.order(listener.order)
-				.beforeModifications(listener.isBeforeModifications)
-				.listener(ScopedEventManager.registeredListenerListenerField.get(listener) as EventListener<Event>)
-				.build())
+		ScopedEventManager.REGISTER_METHOD.invoke(this.eventManager, listener)
 	}
 
 	internal fun unregister(listener: RegisteredListener<*>)
@@ -71,11 +64,15 @@ internal class ScopedEventManager
 
 	companion object
 	{
-		val registeredListenerListenerField: Field = RegisteredListener::class.java.getDeclaredField("listener")
+		@JvmStatic
+		internal val EMPTY: ScopedEventManager = ScopedEventManager()
+
+		@JvmStatic
+		val REGISTER_METHOD: Method = SpongeEventManager::class.java.getDeclaredMethod("register", RegisteredListener::class.java)
 
 		init
 		{
-			this.registeredListenerListenerField.isAccessible = true
+			this.REGISTER_METHOD.isAccessible = true
 		}
 	}
 }
