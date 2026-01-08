@@ -11,33 +11,7 @@ import java.util.ServiceLoader
  */
 interface IHarmonyEventManager<T : Any>
 {
-	/**
-	 * Registers a new scope and creates the associated
-	 * event listeners.
-	 *
-	 * Validation is run to ensure that all the registered
-	 * events have their mapping.
-	 *
-	 * @param scope The scope to register.
-	 * @exception UnsupportedOperationException If the validation fails.
-	 */
-	fun registerScope(scope: T) = this.registerScope(scope, IHarmonyScopeOptions.validate())
-
-	/**
-	 * Registers a new scope and creates the associated
-	 * event listeners.
-	 *
-	 * When [IHarmonyScopeOptions.validate] is `true`, validation is
-	 * run to ensure that all the registered events have their mapping.
-	 * Otherwise, the events are simply ignored.
-	 *
-	 * The supplies listeners from options are appended.
-	 *
-	 * @param scope The scope to register.
-	 * @param options The options for this scope.
-	 * @exception UnsupportedOperationException If the validation fails.
-	 */
-	fun <TScope : T> registerScope(scope: TScope, options: IHarmonyScopeOptions<TScope>)
+	fun registerListeners(scope: T, plugin: Any, listener: Any, lookup: MethodHandles.Lookup? = null)
 
 	/**
 	 * Un-registers the scope and its associated
@@ -45,7 +19,11 @@ interface IHarmonyEventManager<T : Any>
 	 *
 	 * @param scope The scope to un-register.
 	 */
-	fun unregisterScope(scope: T)
+	fun unregisterListeners(scope: T)
+
+	fun unregisterListeners(scope: T, plugin: Any)
+
+	fun unregisterListeners(scope: T, plugin: Any, listener: Any)
 
 	/**
 	 * Represents a builder to create [IHarmonyEventManager] instances.
@@ -66,97 +44,6 @@ interface IHarmonyEventManager<T : Any>
 		fun <TEvent> mapping(eventClass: Class<in TEvent>, mapper: (TEvent) -> T?): IBuilder<T>
 
 		/**
-		 * Adds a scope mapper that finds the associated
-		 * scope to redirect the events to.
-		 *
-		 * The chosen scope of the parent [event manager][IHarmonyEventManager]
-		 * is available here to aid the redirection.
-		 *
-		 * @param TParentScope The parent scope type.
-		 * @param mapper The scope mapper.
-		 * @return This builder, for chaining.
-		 */
-		fun <TParentScope> parentMapping(parentScopeClass: Class<in TParentScope>, mapper: (TParentScope) -> T?): IBuilder<T>
-
-		/**
-		 * Adds an event mapper that finds the associated
-		 * scope to redirect this event to.
-		 *
-		 * The chosen scope of the parent [event manager][IHarmonyEventManager]
-		 * is available here to aid the redirection.
-		 *
-		 * @param TParentScope The parent scope type.
-		 * @param TEvent The event type to map.
-		 * @param eventClass The event class to map.
-		 * @param mapper The event mapper.
-		 * @return This builder, for chaining.
-		 */
-		fun <TParentScope, TEvent> parentMapping(parentScopeClass: Class<in TParentScope>, eventClass: Class<in TEvent>, mapper: (TParentScope, TEvent) -> T?): IBuilder<T>
-
-		/**
-		 * Adds a default listener for the associated scope
-		 * that is automatically instantiated when the scope
-		 * is registered.
-		 *
-		 * @param TScope The scope type.
-		 * @param scopeClass The scope class.
-		 * @param plugin The underlying platform plugin which is associated to the listener object.
-		 * @param listener The factory which instantiates the listener object for the associated scope.
-		 * @return This builder, for chaining.
-		 */
-		fun <TScope : T> listener(scopeClass: Class<in TScope>, plugin: Any, listener: (TScope) -> Any): IBuilder<T> =
-			this.listener(IHarmonyEventListener.of(scopeClass, plugin, listener, null))
-
-		/**
-		 * Adds a default listener for the associated scope
-		 * that is automatically instantiated when the scope
-		 * is registered.
-		 *
-		 * @param TScope The scope type.
-		 * @param scopeClass The scope class.
-		 * @param plugin The underlying platform plugin which is associated to the listener object.
-		 * @param listener The factory which instantiates the listener object for the associated scope.
-		 * @param lookup The lookup with which to access the listener object.
-		 * @return This builder, for chaining.
-		 */
-		fun <TScope : T> listener(scopeClass: Class<in TScope>, plugin: Any, listener: (TScope) -> Any, lookup: MethodHandles.Lookup): IBuilder<T> =
-			this.listener(IHarmonyEventListener.of(scopeClass, plugin, listener, lookup))
-
-		/**
-		 * Adds a default listener for the associated scope
-		 * that is automatically instantiated when the scope
-		 * is registered.
-		 *
-		 * @param plugin The underlying platform plugin which is associated to the listener object.
-		 * @param listener The factory which instantiates the listener object for the associated scope.
-		 * @return This builder, for chaining.
-		 */
-		fun listener(plugin: Any, listener: (T) -> Any): IBuilder<T>
-
-		/**
-		 * Adds a default listener for the associated scope
-		 * that is automatically instantiated when the scope
-		 * is registered.
-		 *
-		 * @param plugin The underlying platform plugin which is associated to the listener object.
-		 * @param listener The factory which instantiates the listener object for the associated scope.
-		 * @param lookup The lookup with which to access the listener object.
-		 * @return This builder, for chaining.
-		 */
-		fun listener(plugin: Any, listener: (T) -> Any, lookup: MethodHandles.Lookup): IBuilder<T>
-
-		/**
-		 * Adds a default listener for the associated scope
-		 * that is automatically instantiated when the scope
-		 * is registered.
-		 *
-		 * @param TScope The scope type.
-		 * @param listener The listener.
-		 * @return This builder, for chaining.
-		 */
-		fun <TScope : T> listener(listener: IHarmonyEventListener<TScope>): IBuilder<T>
-
-		/**
 		 * Creates a [IHarmonyEventManager] based on this builder.
 		 * @return A new [IHarmonyEventManager].
 		 */
@@ -175,37 +62,6 @@ interface IHarmonyEventManager<T : Any>
 			 */
 			inline fun <TScope : Any, reified TEvent> IBuilder<TScope>.mapping(noinline mapper: (TEvent) -> TScope?): IBuilder<TScope> =
 				this.mapping(TEvent::class.java, mapper)
-
-			/**
-			 * Adds a scope mapper that finds the associated
-			 * scope to redirect the events to.
-			 *
-			 * The chosen scope of the parent [event manager][IHarmonyEventManager]
-			 * is available here to aid the redirection.
-			 *
-			 * @param TScope The scope type.
-			 * @param TParentScope The parent scope type.
-			 * @param mapper The scope mapper.
-			 * @return This builder, for chaining.
-			 */
-			inline fun <TScope : Any, reified TParentScope> IBuilder<TScope>.parentMapping(noinline mapper: (TParentScope) -> TScope?): IBuilder<TScope> =
-				this.parentMapping(TParentScope::class.java, mapper)
-
-			/**
-			 * Adds an event mapper that finds the associated
-			 * scope to redirect this event to.
-			 *
-			 * The chosen scope of the parent [event manager][IHarmonyEventManager]
-			 * is available here to aid the redirection.
-			 *
-			 * @param TScope The scope type.
-			 * @param TParentScope The parent scope type.
-			 * @param TEvent The event type to map.
-			 * @param mapper The event mapper.
-			 * @return This builder, for chaining.
-			 */
-			inline fun <TScope : Any, reified TParentScope, reified TEvent> IBuilder<TScope>.parentMapping(noinline mapper: (TParentScope, TEvent) -> TScope?): IBuilder<TScope> =
-				this.parentMapping(TParentScope::class.java, TEvent::class.java, mapper)
 		}
 	}
 
