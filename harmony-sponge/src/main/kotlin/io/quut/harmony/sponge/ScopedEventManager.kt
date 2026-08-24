@@ -1,10 +1,10 @@
 package io.quut.harmony.sponge
 
-import io.quut.harmony.api.IHarmonyEventListener
 import org.spongepowered.api.event.Event
 import org.spongepowered.common.event.manager.RegisteredListener
 import org.spongepowered.common.event.manager.SpongeEventManager
 import org.spongepowered.plugin.PluginContainer
+import java.lang.invoke.MethodHandles
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 
@@ -32,20 +32,15 @@ internal class ScopedEventManager
 		this.listeners = multiMap.javaClass.getDeclaredMethod("values").invoke(multiMap) as Collection<RegisteredListener<*>>
 	}
 
-	internal fun <T : Any> registerAll(scope: T, listeners: Collection<IHarmonyEventListener<T>>)
+	internal fun register(plugin: PluginContainer, listener: Any, lookup: MethodHandles.Lookup?)
 	{
-		listeners.forEach { listener -> this.register(scope, listener) }
-	}
-
-	private fun <T : Any> register(scope: T, listener: IHarmonyEventListener<T>)
-	{
-		if (listener.lookup != null)
+		if (lookup != null)
 		{
-			this.eventManager.registerListeners(listener.plugin as PluginContainer, listener.listener.invoke(scope), listener.lookup)
+			this.eventManager.registerListeners(plugin, listener, lookup)
 		}
 		else
 		{
-			this.eventManager.registerListeners(listener.plugin as PluginContainer, listener.listener.invoke(scope))
+			this.eventManager.registerListeners(plugin, listener)
 		}
 	}
 
@@ -64,9 +59,6 @@ internal class ScopedEventManager
 
 	companion object
 	{
-		@JvmStatic
-		internal val EMPTY: ScopedEventManager = ScopedEventManager()
-
 		@JvmStatic
 		val REGISTER_METHOD: Method = SpongeEventManager::class.java.getDeclaredMethod("register", RegisteredListener::class.java)
 

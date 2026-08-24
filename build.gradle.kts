@@ -6,20 +6,20 @@ plugins {
 
 allprojects {
 	group = "io.quut"
-	version = "1.2.3"
+	version = "2.0.0-SNAPSHOT"
 
 	apply(plugin = "com.diffplug.spotless")
 
 	spotless {
 		kotlin {
 			ktlint()
-			indentWithTabs()
+			leadingSpacesToTabs()
 			endWithNewline()
 			trimTrailingWhitespace()
 		}
 
 		java {
-			indentWithTabs()
+			leadingSpacesToTabs()
 			endWithNewline()
 			trimTrailingWhitespace()
 			removeUnusedImports()
@@ -27,7 +27,7 @@ allprojects {
 
 		kotlinGradle {
 			ktlint()
-			indentWithTabs()
+			leadingSpacesToTabs()
 			endWithNewline()
 			trimTrailingWhitespace()
 		}
